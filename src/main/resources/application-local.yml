@@ -1,0 +1,24 @@
+server:
+  port: -1
+
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@27.155.100.250:1521:XE
+    username: OMP
+    password: OMP
+    hikari:
+      maximum-pool-size: 100
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        enable_lazy_load_no_trans: true
+
+resourceDir: /Users/zzx/Downloads/kenken/
+
+debug-mode: true
+
+maple-info:
+  storage-dir: /Users/zzx/Downloads/maple
+  tower-dir: /Users/zzx/Downloads/OZ
