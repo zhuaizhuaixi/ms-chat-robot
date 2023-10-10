@@ -1,21 +1,18 @@
 package com.zzx.robot.domain.message.handler;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.zzx.robot.domain.message.MessageCommand;
 import com.zzx.robot.domain.message.MessageHandler;
-import com.zzx.robot.domain.message.MessageSender;
 import com.zzx.robot.domain.model.entity.User;
 import com.zzx.robot.domain.repository.UserRepository;
+import com.zzx.robot.util.MessageConstants;
 import com.zzx.robot.util.DateUtils;
 import com.zzx.robot.websocket.message.MessageConstructor;
+import org.apache.camel.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
 
 import java.io.File;
 import java.util.*;
@@ -32,63 +29,45 @@ public class GroupTowerHandler implements MessageHandler {
     private final Random random = new Random(System.currentTimeMillis());
 
     @Autowired
-    private MessageSender messageSender;
-
-    @Autowired
     private UserRepository userRepository;
 
     @Value("${maple-info.tower-dir}")
     private String towerImageDir;
 
     @Override
-    public boolean match(String type, String message) {
-        return "group".equals(type) && message.startsWith("爬个塔");
-    }
+    public ObjectNode handle(Message message) {
 
-    @Override
-    public void handle(WebSocketSession session, JsonNode message) {
+        String messageString = message.getBody(String.class);
+        logger.info(messageString);
 
-        try {
-
-            String messageString = message.get(MessageCommand.CQ_KEY_MESSAGE).asText();
-            logger.info(messageString);
-
-            // 判断用户今日是否爬过塔
-            String qq = message.get("user_id").asText();
-            User user = userRepository.findByQq(qq);
-            if (user == null) {
-                user = new User();
-                user.setQq(qq);
-                user.setLastTowerTime(new Date());
+        // 判断用户今日是否爬过塔
+        String qq = message.getHeader(MessageConstants.Header.SENDER_ID, String.class);
+        User user = userRepository.findByQq(qq);
+        if (user == null) {
+            user = new User();
+            user.setQq(qq);
+            user.setLastTowerTime(new Date());
+        } else {
+            if (user.getLastTowerTime() != null && user.getLastTowerTime().after(DateUtils.todayInitialDate())) {
+                // 今天已经爬过
+                return MessageConstructor.newGroupMessage(message.getHeader(MessageConstants.Header.GROUP_ID, String.class), "今天爬过塔了，明天再来");
             } else {
-                if (user.getLastTowerTime() != null && user.getLastTowerTime().after(DateUtils.todayInitialDate())) {
-                    // 今天已经爬过
-                    ObjectNode groupMessage = MessageConstructor.newGroupMessage(message.get("group_id").asText(), "今天爬过塔了，明天再来");
-                    messageSender.send(session, new TextMessage(groupMessage.toString()));
-                    return;
-                } else {
-                    user.setLastTowerTime(new Date());
-                }
+                user.setLastTowerTime(new Date());
             }
-            userRepository.save(user);
-            StringBuilder qqMessage = new StringBuilder("今日爬塔结果为：\n");
-            for (int i = 0; i < 5; i++) {
-                String ring = RING_LIST.get(random.nextInt(RING_LIST.size()));
-                String level = LEVEL_LIST.get(random.nextInt(LEVEL_LIST.size()));
-                String ringPicImage = towerImageDir + File.separator + ring.replace(" ", "_") + ".png";
-                if (ring.contains("Ring")) {
-                    ring = ring + " " + level;
-                }
-                qqMessage.append("[CQ:image,file=ring.png,subType=0,url=file://").append(ringPicImage).append("]").append(ring).append("\n");
+        }
+        userRepository.save(user);
+        StringBuilder qqMessage = new StringBuilder("今日爬塔结果为：\n");
+        for (int i = 0; i < 5; i++) {
+            String ring = RING_LIST.get(random.nextInt(RING_LIST.size()));
+            String level = LEVEL_LIST.get(random.nextInt(LEVEL_LIST.size()));
+            String ringPicImage = towerImageDir + File.separator + ring.replace(" ", "_") + ".png";
+            if (ring.contains("Ring")) {
+                ring = ring + " " + level;
             }
-
-            ObjectNode groupMessage = MessageConstructor.newGroupMessage(message.get("group_id").asText(), qqMessage.toString());
-            messageSender.send(session, new TextMessage(groupMessage.toString()));
-        } catch (Exception e) {
-            logger.error("爬塔失败：", e);
+            qqMessage.append("[CQ:image,file=ring.png,subType=0,url=file://").append(ringPicImage).append("]").append(ring).append("\n");
         }
 
-
+        return MessageConstructor.newGroupMessage(message.getHeader(MessageConstants.Header.GROUP_ID, String.class), qqMessage.toString());
     }
 
     private static final List<String> RING_LIST = new ArrayList<>();

@@ -1,17 +1,13 @@
 package com.zzx.robot.domain.message.handler;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.zzx.robot.domain.message.MessageCommand;
 import com.zzx.robot.domain.message.MessageHandler;
-import com.zzx.robot.domain.message.MessageSender;
+import com.zzx.robot.util.MessageConstants;
 import com.zzx.robot.websocket.message.MessageConstructor;
+import org.apache.camel.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketSession;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,32 +24,17 @@ public class GroupFamiliarHandler implements MessageHandler {
 
     private final Random random = new Random(System.currentTimeMillis());
 
-    @Autowired
-    private MessageSender messageSender;
-
     @Override
-    public boolean match(String type, String message) {
-        return "group".equals(type) && message.startsWith("抽张怪怪卡");
-    }
+    public ObjectNode handle(Message message) {
+        String messageString = message.getBody(String.class);
+        logger.info(messageString);
 
-    @Override
-    public void handle(WebSocketSession session, JsonNode message) {
-        try {
+        String firstLine = RANK_UNIQUE.get(random.nextInt(RANK_UNIQUE.size()));
+        String secondLine = RANK_EPIC.get(random.nextInt(RANK_EPIC.size()));
 
-            String messageString = message.get(MessageCommand.CQ_KEY_MESSAGE).asText();
-            logger.info(messageString);
+        String result = firstLine + "\n" + secondLine;
 
-            String firstLine = RANK_UNIQUE.get(random.nextInt(RANK_UNIQUE.size()));
-            String secondLine = RANK_EPIC.get(random.nextInt(RANK_EPIC.size()));
-
-            String result = firstLine + "\n" + secondLine;
-
-            ObjectNode groupMessage = MessageConstructor.newGroupMessage(message.get("group_id").asText(), result);
-            messageSender.send(session, new TextMessage(groupMessage.toString()));
-
-        } catch (Exception e) {
-            logger.error("抽张怪怪卡失败: ", e);
-        }
+        return MessageConstructor.newGroupMessage(message.getHeader(MessageConstants.Header.GROUP_ID, String.class), result);
     }
 
     private static final List<String> RANK_UNIQUE = new ArrayList<String>() {{

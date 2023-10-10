@@ -11,6 +11,11 @@ public class MessageCommand {
     public static String CQ_KEY_POST_TYPE = "post_type";
     public static String CQ_KEY_MESSAGE = "message";
     public static String CQ_KEY_MESSAGE_TYPE = "message_type";
+    public static String CQ_KEY_MESSAGE_ID = "message_id";
+    public static String CQ_KEY_USER_ID = "user_id";
+    public static String CQ_KEY_GROUP_ID = "group_id";
+    public static String CQ_KEY_GUILD_ID = "guild_id";
+    public static String CQ_KEY_CHANNEL_ID = "channel_id";
 
     /**
      * 群聊(group)、频道(guild)

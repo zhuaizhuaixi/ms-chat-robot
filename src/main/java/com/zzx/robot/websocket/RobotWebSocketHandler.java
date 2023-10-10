@@ -2,16 +2,16 @@ package com.zzx.robot.websocket;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.zzx.robot.domain.message.MessageCommand;
-import com.zzx.robot.domain.message.MessageHandler;
+import com.zzx.robot.router.CommandRouter;
+import com.zzx.robot.util.MessageConstants;
+import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.*;
 
-import java.util.*;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * @date 2023/3/24
  */
 @Component
-public class RobotWebSocketHandler implements WebSocketHandler {
+public class RobotWebSocketHandler {
 
     private final Logger logger = LoggerFactory.getLogger(RobotWebSocketHandler.class);
 
@@ -30,67 +30,43 @@ public class RobotWebSocketHandler implements WebSocketHandler {
      */
     ThreadPoolExecutor executor = new ThreadPoolExecutor(5, 5, 100, TimeUnit.SECONDS, new LinkedBlockingDeque<>(), new ThreadFactoryBuilder().setNameFormat("websocket-request-process-%d").build());
 
-    private final List<MessageHandler> handlers;
+    private final ProducerTemplate producerTemplate;
 
-    public RobotWebSocketHandler(List<MessageHandler> handlerList) {
-        handlers = handlerList;
+    public RobotWebSocketHandler(ProducerTemplate producerTemplate) {
+        this.producerTemplate = producerTemplate;
     }
 
-    @Override
-    public void afterConnectionEstablished(WebSocketSession session) throws Exception {
-
-    }
-
-    @Override
     public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
 
         String payload = (String) message.getPayload();
         logger.info("收到来自go-cqhttp的消息" + payload);
         ObjectMapper om = new ObjectMapper();
         JsonNode messageInfo = om.readTree(payload);
-        String postType = messageInfo.get(MessageCommand.CQ_KEY_POST_TYPE) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_POST_TYPE).asText();
-        if (MessageCommand.CQ_KEY_MESSAGE.equals(postType)) {
+        executor.execute(() -> producerTemplate.request("direct:" + CommandRouter.ROUTE_PATH_COMMAND, exchange -> {
 
-            String messageString = messageInfo.get(MessageCommand.CQ_KEY_MESSAGE).asText();
-            logger.info("消息内容: " + messageString);
-            String messageType = messageInfo.get(MessageCommand.CQ_KEY_MESSAGE_TYPE).asText();
-            String command = messageString.split(" ")[0];
+            // 将部分信息解析为header
+            String postType = messageInfo.get(MessageCommand.CQ_KEY_POST_TYPE) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_POST_TYPE).asText();
+            String messageString = messageInfo.get(MessageCommand.CQ_KEY_MESSAGE) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_MESSAGE).asText();
+            String messageType = messageInfo.get(MessageCommand.CQ_KEY_MESSAGE_TYPE) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_MESSAGE_TYPE).asText();
+            String messageId = messageInfo.get(MessageCommand.CQ_KEY_MESSAGE_ID) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_MESSAGE_ID).asText();
+            String userId = messageInfo.get(MessageCommand.CQ_KEY_USER_ID) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_USER_ID).asText();
+            String groupId = messageInfo.get(MessageCommand.CQ_KEY_GROUP_ID) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_GROUP_ID).asText();
+            String guildId = messageInfo.get(MessageCommand.CQ_KEY_GUILD_ID) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_GUILD_ID).asText();
+            String channelId = messageInfo.get(MessageCommand.CQ_KEY_CHANNEL_ID) == null ? "" : messageInfo.get(MessageCommand.CQ_KEY_CHANNEL_ID).asText();
+            String briefCommand = messageString.split(" ")[0];
 
-            // 根据commandMessage中的type和command查找出对应的命令处理
-            for (MessageHandler handler : handlers) {
-                if (handler.match(messageType, command)) {
-                    executor.execute(() -> {
-                        // 跳过部分群
-                        if ("group".equals(messageInfo.get("message_type").asText())) {
-                            Set<String> excludeGroup = Sets.newHashSet("293385059", "154681251", "578160115", "232112159");
-                            if (excludeGroup.contains(messageInfo.get("group_id").asText())) {
-                                return;
-                            }
-                        }
+            exchange.getMessage().setHeader(MessageConstants.Header.POST_TYPE, postType);
+            exchange.getMessage().setHeader(MessageConstants.Header.BRIEF_COMMAND, briefCommand);
+            exchange.getMessage().setHeader(MessageConstants.Header.MESSAGE_TYPE, messageType);
+            exchange.getMessage().setHeader(MessageConstants.Header.MESSAGE_ID, messageId);
+            exchange.getMessage().setHeader(MessageConstants.Header.SENDER_ID, userId);
+            exchange.getMessage().setHeader(MessageConstants.Header.GROUP_ID, groupId);
+            exchange.getMessage().setHeader(MessageConstants.Header.GUILD_ID, guildId);
+            exchange.getMessage().setHeader(MessageConstants.Header.CHANNEL_ID, channelId);
 
-                        handler.handle(session, messageInfo);
-                    });
-                    break;
-                }
-            }
-        }
-    }
-
-    @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+            exchange.getMessage().setBody(messageString, String.class);
+        }));
 
     }
 
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
-        // 尝试重连
-        logger.warn("链接断开：" + closeStatus.toString());
-
-
-    }
-
-    @Override
-    public boolean supportsPartialMessages() {
-        return false;
-    }
 }
