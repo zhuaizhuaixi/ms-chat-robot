@@ -40,33 +40,33 @@ public class CommandRouter extends EndpointRouteBuilder {
                 .choice()
                     .when(header(MESSAGE_TYPE).isEqualTo("group"))
                     .choice()
-                        .when(header(BRIEF_COMMAND).startsWith("绑定")).process(new InnerProcessor(context.getBean(GroupBindHandler.class)))
-                        .when(header(BRIEF_COMMAND).isEqualTo("找个线")).process(new InnerProcessor(context.getBean(GroupChannelHandler.class)))
-                        .when(header(BRIEF_COMMAND).isEqualTo("抽张怪怪卡")).process(new InnerProcessor(context.getBean(GroupFamiliarHandler.class)))
-                        .when(header(BRIEF_COMMAND).startsWith("来张")).process(new InnerProcessor(context.getBean(GroupPictureHandler.class)))
-                        .when(header(BRIEF_COMMAND).startsWith("查询")).process(new InnerProcessor(context.getBean(GroupQueryHandler.class)))
-                        .when(header(BRIEF_COMMAND).contains("上上星")).process(new InnerProcessor(context.getBean(GroupStarForceHandler.class)))
-                        .when(header(BRIEF_COMMAND).isEqualTo("爬个塔")).process(new InnerProcessor(context.getBean(GroupTowerHandler.class)))
-                        .when(header(BRIEF_COMMAND).isEqualTo("添加词条")).process(new InnerProcessor(context.getBean(GroupAddHandler.class)))
-                        .when(header(BRIEF_COMMAND).isEqualTo("删除词条")).process(new InnerProcessor(context.getBean(GroupDeleteHandler.class)))
-                        .when(header(BRIEF_COMMAND).isEqualTo("查")).process(new InnerProcessor(context.getBean(com.zzx.robot.domain.message.handler.entry.GroupQueryHandler.class)))
-                        .when(header(BRIEF_COMMAND).isEqualTo("词条列表")).process(new InnerProcessor(context.getBean(GroupListHandler.class)))
+                        .when(header(BRIEF_COMMAND).startsWith("绑定")).process(new InnerProcessor(GroupBindHandler.class))
+                        .when(header(BRIEF_COMMAND).isEqualTo("找个线")).process(new InnerProcessor(GroupChannelHandler.class))
+                        .when(header(BRIEF_COMMAND).isEqualTo("抽张怪怪卡")).process(new InnerProcessor(GroupFamiliarHandler.class))
+                        .when(header(BRIEF_COMMAND).startsWith("来张")).process(new InnerProcessor(GroupPictureHandler.class))
+                        .when(header(BRIEF_COMMAND).startsWith("查询")).process(new InnerProcessor(GroupQueryHandler.class))
+                        .when(header(BRIEF_COMMAND).contains("上上星")).process(new InnerProcessor(GroupStarForceHandler.class))
+                        .when(header(BRIEF_COMMAND).isEqualTo("爬个塔")).process(new InnerProcessor(GroupTowerHandler.class))
+                        .when(header(BRIEF_COMMAND).isEqualTo("添加词条")).process(new InnerProcessor(GroupAddHandler.class))
+                        .when(header(BRIEF_COMMAND).isEqualTo("删除词条")).process(new InnerProcessor(GroupDeleteHandler.class))
+                        .when(header(BRIEF_COMMAND).isEqualTo("查")).process(new InnerProcessor(com.zzx.robot.domain.message.handler.entry.GroupQueryHandler.class))
+                        .when(header(BRIEF_COMMAND).isEqualTo("词条列表")).process(new InnerProcessor(GroupListHandler.class))
                     .endChoice()
                     .when(header(MESSAGE_TYPE).isEqualTo("guild"))
                     .choice()
-                        .when(header(BRIEF_COMMAND).startsWith("查询")).process(new InnerProcessor(context.getBean(GuildQueryHandler.class)))
+                        .when(header(BRIEF_COMMAND).startsWith("查询")).process(new InnerProcessor(GuildQueryHandler.class))
                     .endChoice()
                 .endChoice()
                 .end()
                 .to(direct(SenderRouter.ROUTE_PATH_SENDER));
     }
 
-    private static class InnerProcessor implements Processor {
+    private class InnerProcessor implements Processor {
 
         private final MessageHandler messageHandler;
 
-        public InnerProcessor(MessageHandler messageHandler) {
-            this.messageHandler = messageHandler;
+        public InnerProcessor(Class<?extends MessageHandler> clazz) {
+            this.messageHandler = context.getBean(clazz);
         }
 
         @Override
